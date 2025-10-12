@@ -47,6 +47,7 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
     var tape_length: ?usize = null;
     var mode: ?BfMode = null;
     var file_name: ?[]const u8 = null;
+    errdefer if (file_name) |fname| allocator.free(fname);
 
     {var i: usize = 1;
     while (i < args.len) : (i += 1) {
