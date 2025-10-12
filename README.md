@@ -9,7 +9,7 @@
 To download the `bfc` toolchain, you must first have [Zig 0.15.x](https://ziglang.org/download/#:~:text=52MiB-,0.15.2,-2025%2D10%2D11) installed
 
 > [!NOTE]
-> master or version prior to 0.15 may work, though it is recommended to use a 0.15 version of the compiler for ensured compatibily
+> master or versions prior to 0.15 may work, though it is recommended to use a 0.15 version of the compiler for ensured compatibily
 
 After you have installed Zig, download the repository and cd into it. Then run
 ```sh
@@ -30,3 +30,4 @@ This toolchain is highly incomplete, here is a incomprehensive list of things le
     - [ ] C++
     - [ ] Rust
 - [ ] Compilation to an executable
+- [ ] Build system
