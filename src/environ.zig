@@ -65,7 +65,10 @@ pub const BfEnvironment = struct {
                             tmp_column = 0;
                         }
                     }
-                    if (idx2 == program.len) std.debug.panic("@ {}:{} Found '[' without matching ']'", .{line, column});
+                    if (idx2 == program.len) {
+                        std.log.err("@ {}:{} Found '[' without matching ']'", .{line, column});
+                        return error.MissingSquareBracket;
+                    }
 
                     if (environ.tape[environ.pointer] == 0) {
                         line = tmp_line;
@@ -80,8 +83,10 @@ pub const BfEnvironment = struct {
                     }
                 },
                 ']' => {
-                    if (loop_idxs.items.len == 0)
-                        std.debug.panic("@ {}:{} Rogue ']' in program", .{line, column});
+                    if (loop_idxs.items.len == 0) {
+                        std.log.err("@ {}:{} Rogue ']' in program", .{line, column});
+                        return error.RogueSquareBracket;
+                    }
 
                     if (environ.tape[environ.pointer] != 0) {
                         const cache = lc_cache.items[lc_cache.items.len-1];
