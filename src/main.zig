@@ -1,14 +1,15 @@
 const std = @import("std");
-const BfEnvironment = @import("environ.zig").BfEnvironment;
+const environ = @import("environ.zig");
+const BfEnvironment = environ.BfEnvironment;
 
 pub const std_options: std.Options = .{
     .log_level = .warn,
 };
 
-const BfMode = enum {
+const BfMode = union(enum) {
     interpret,
     compile, // TODO
-    transpile, // TODO
+    transpile: environ.Language, // TODO
 };
 
 const ArgsStruct = struct {
@@ -25,16 +26,18 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    for (args) |arg| {
+    for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "-h") or std.mem.eql(u8, arg, "--help")) {
             std.debug.print(
             \\Usage: bfc -f [filename] -i (extra flags)
             \\
             \\    Flags:
-            \\    -f [string], --file=[string] (REQUIRED) File to process
-            \\    -i,          --interpret     (REQUIRED (for now)) Interpret the source files
-            \\    -l [usize],  --len=[usize]   Length of the tape
-            \\    -h,          --help          Print this message then exit
+            \\    -f [string], --file=[string]    (REQUIRED) File to process
+            \\    -i,          --interpret        (REQUIRED (for now)) Interpret the source file
+            \\    -c           --compile          (UNIMPLEMENTED) Compile the source file
+            \\    -t [lang]    --transpile=[lang] (UNIMPLEMENTED) transpile the source file
+            \\    -l [usize],  --len=[usize]      Length of the tape
+            \\    -h,          --help             Print this message then exit
             \\
             , .{});
             return error.Exit0; // This is to gracefully return from the function, avoiding memory leaks
@@ -45,7 +48,7 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
     var mode: ?BfMode = null;
     var file_name: ?[]const u8 = null;
 
-    {var i: usize = 0;
+    {var i: usize = 1;
     while (i < args.len) : (i += 1) {
         const arg = args[i];
         if (std.mem.eql(u8, arg, "-i") or std.mem.eql(u8, arg, "--interpret")) {
@@ -55,6 +58,81 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
             }
 
             mode = .interpret;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-c") or std.mem.eql(u8, arg, "--compile")) {
+            if (mode != null) {
+                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
+                return error.Repeat;
+            }
+
+            mode = .compile;
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "-t")) {
+            if (mode != null) {
+                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
+                return error.Repeat;
+            }
+
+            if (i == args.len-1) {
+                std.log.err("Missing required parameter for argument -t", .{});
+                return error.MissingValue;
+            }
+
+            i += 1;
+            const str_to_enum = std.meta.stringToEnum(environ.Language, args[i]);
+
+            if (str_to_enum == null) {
+                std.log.err(
+                    \\Invalid language provided: '{s}'
+                    \\
+                    \\List of valid languages:
+                    \\    zig
+                    \\    c
+                    \\    cpp
+                    \\    rust
+                    \\    python
+                    \\    js
+                    \\    go
+                , .{args[i]});
+                return error.InvalidLang;
+            }
+
+            mode = .{ .transpile = str_to_enum.? };
+            continue;
+        }
+        if (std.mem.startsWith(u8, arg, "--transpile=")) {
+            if (mode != null) {
+                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
+                return error.Repeat;
+            }
+
+            const lang = arg[12..];
+            if (lang.len == 0) {
+                std.log.err("No value provided for argument --transpile=[lang]", .{});
+                return error.MissingValue;
+            }
+
+            const str_to_enum = std.meta.stringToEnum(environ.Language, lang);
+
+            if (str_to_enum == null) {
+                std.log.err(
+                    \\Invalid language provided: '{s}'
+                    \\
+                    \\List of valid languages:
+                    \\    zig
+                    \\    c
+                    \\    cpp
+                    \\    rust
+                    \\    python
+                    \\    js
+                    \\    go
+                , .{lang});
+                return error.InvalidLang;
+            }
+
+            mode = .{ .transpile = str_to_enum.? };
             continue;
         }
         if (std.mem.eql(u8, arg, "-l")) {
@@ -118,7 +196,9 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
                 return error.MissingValue;
             }
 
-            file_name = try allocator.dupe(u8, args[i+1]);
+            i += 1;
+            file_name = try allocator.dupe(u8, args[i]);
+            continue;
         }
         if (std.mem.startsWith(u8, arg, "--file=")) {
             if (file_name != null) {
@@ -133,7 +213,10 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
             }
 
             file_name = try allocator.dupe(u8, file);
+            continue;
         }
+        std.log.err("Unknown flag or parameter: '{s}'", .{arg});
+        return error.Unknown;
     }}
 
     if (mode == null) {
@@ -158,6 +241,11 @@ pub fn main() !void {
         }
     };
     defer args.deinit(gpa);
+
+    if (args.mode != .interpret) {
+        std.log.err("Use of unimplemented mode: '{s}'", .{@tagName(args.mode)});
+        return error.WrongMode;
+    }
 
     const file_extention = args.file_name[(std.mem.lastIndexOfScalar(u8, args.file_name, '.') orelse args.file_name.len)..];
     if (!std.mem.eql(u8, file_extention, ".bf") and !std.mem.eql(u8, file_extention, ".b")) {
