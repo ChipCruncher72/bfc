@@ -35,7 +35,7 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
             \\    -f [string], --file=[string]    (REQUIRED) File to process
             \\    -i,          --interpret        (REQUIRED (for now)) Interpret the source file
             \\    -c           --compile          (UNIMPLEMENTED) Compile the source file
-            \\    -t [lang]    --transpile=[lang] (UNIMPLEMENTED) transpile the source file
+            \\    -t [lang]    --transpile=[lang] (UNIMPLEMENTED) Transpile the source file
             \\    -l [usize],  --len=[usize]      Length of the tape
             \\    -h,          --help             Print this message then exit
             \\
