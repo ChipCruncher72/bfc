@@ -1,4 +1,6 @@
-# `bfc`: The Brainfuck Compiler and Interpreter
+# `bfc`: Brainfuck Compiler\* and Interpreter
+<sup>\*Cannot compile any code as of yet</sup>\
+<sup>`bfc` stands for BrainFuck Code tool (The tool is silent)</sup>
 
 > [!WARNING]
 > This project is in pre-release, expect bugs and/or an unfinished product if you decide to download this
@@ -19,12 +21,12 @@ zig build -Doptimize=ReleaseFast
 ```
 You should now be able to find the executable under `./zig-out/bin` named "bfc"
 ```
-# Run this to get help for the compiler
+# Run this to get help for the compiler!
 bfc -h
 ```
 
 ## Tasks
-This compiler/interpreter is highly incomplete, here is a incomprehensive list of things left to do:
+The compiler/interpreter is highly incomplete, here is a incomprehensive list of things left to do:
 - [x] Interpret files
 - [ ] Allow io to files
 - [x] Add a `-h` and `--help` compiler flag
