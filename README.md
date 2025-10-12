@@ -25,8 +25,8 @@ This toolchain is highly incomplete, here is a incomprehensive list of things le
 - [ ] Allow io to files
 - [ ] Add a `-h` and `--help` compiler flag
 - [ ] Implement trans-compilation
-      - [ ] Zig
-      - [ ] C
-      - [ ] C++
-      - [ ] Rust
+      + [ ] Zig
+      + [ ] C
+      + [ ] C++
+      + [ ] Rust
 - [ ] \(Optional) Compile to an executable
