@@ -121,3 +121,75 @@ pub const BfEnvironment = struct {
     // TODO
     //pub fn transpile(environ: BfEnvironment, program: []const u8, lang: Language) !void {}
 };
+
+test "Hello, World!" {
+    const gpa = std.testing.allocator;
+    var tape: [1000]u8 = @splat(0);
+
+    var out_buf: [100]u8 = undefined;
+    const in_buf: [0]u8 = undefined;
+
+    var writer: std.Io.Writer = .fixed(out_buf[0..]);
+    var reader: std.Io.Reader = .fixed(in_buf[0..]);
+
+    var bf: BfEnvironment = .init(&writer, &reader, tape[0..]);
+    try bf.exec(gpa,
+        \\+++++++++++[>++++++>+++++++++>++++++++>++++>+++>+<<<<<<-]>+++
+        \\+++.>++.+++++++..+++.>>.>-.<<-.<.+++.------.--------.>>>+.>-.
+    );
+
+    try std.testing.expectEqualStrings(writer.buffered(), "Hello, World!\n");
+}
+
+test "cat" {
+    const gpa = std.testing.allocator;
+    var tape: [1000]u8 = @splat(0);
+
+    var out_buf: [100]u8 = undefined;
+    const in_buf = "abcdef";
+
+    var writer: std.Io.Writer = .fixed(out_buf[0..]);
+    var reader: std.Io.Reader = .fixed(in_buf[0..]);
+
+    var bf: BfEnvironment = .init(&writer, &reader, tape[0..]);
+    try bf.exec(gpa,
+        \\,[.[-],]
+    );
+
+    try std.testing.expectEqualStrings(writer.buffered(), in_buf);
+}
+
+test "quine" {
+    const gpa = std.testing.allocator;
+    var tape: [1000]u8 = @splat(0);
+
+    const program = \\-->+++>+>+>+>+++++>++>++>->+++>++>+>>>>>>>>>>>>>>>>->++++>>>>->+++>+++>+++>+++>+
+                    ++
+                    \\++>+++>+>+>>>->->>++++>+>>>>->>++++>+>+>>->->++>++>++>++++>+>++>->++>++++>+>+>++
+                    ++
+                    \\>++>->->++>++>++++>+>+>>>>>->>->>++++>++>++>++++>>>>>->>>>>+++>->++++>->->->+++>
+                    ++
+                    \\>>+>+>+++>+>++++>>+++>->>>>>->>>++++>++>++>+>+++>->++++>>->->+++>+>+++>+>++++>>>
+                    ++
+                    \\+++>->++++>>->->++>++++>++>++++>>++[-[->>+[>]++[<]<]>>+[>]<--[++>++++>]+[<]<<++]
+                    ++
+                    \\>>>[>]++++>++++[--[+>+>++++<<[-->>--<<[->-<[--->>+<<[+>+++<[+>>++<<]]]]]]>+++[>+
+                    ++
+                    \\++++++++++++++<-]>--.<<<]
+    ;
+
+    var out_buf: [program.len]u8 = undefined;
+    const in_buf: [0]u8 = undefined;
+
+    var writer: std.Io.Writer = .fixed(out_buf[0..]);
+    var reader: std.Io.Reader = .fixed(in_buf[0..]);
+
+    var bf: BfEnvironment = .init(&writer, &reader, tape[0..]);
+    try bf.exec(gpa, program);
+
+    try std.testing.expectEqualStrings(writer.buffered(), program);
+}
+
+test "BfEnvironment.transpile" {
+    return error.SkipZigTest;
+}

@@ -17,11 +17,24 @@ pub fn build(b: *std.Build) !void {
         .version = SemVer.parse("0.1.0-dev.1") catch unreachable,
     });
 
-    const install_step = b.getInstallStep();
-    const ast_check = b.step("ast",
-        \\Perform an AST check on the source code (It's the same as invoking zig build install, used for more zls errors)
-    );
-    ast_check.dependOn(install_step);
-
     b.installArtifact(exe);
+
+    const test_step = b.step("test", "Perform unit tests");
+
+    const test_mod = b.createModule(.{
+        .root_source_file = b.path("src/test.zig"),
+        .optimize = optimize,
+        .target = target,
+    });
+    const unit_test = b.addTest(.{
+        .root_module = test_mod,
+    });
+
+    const run_test = b.addRunArtifact(unit_test);
+
+    if (b.args) |args| {
+        run_test.addArgs(args);
+    }
+
+    test_step.dependOn(&run_test.step);
 }
