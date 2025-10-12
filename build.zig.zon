@@ -1,7 +1,12 @@
 .{
-    .name = .brainf_cmdtool,
+    .name = .bfc,
     .version = "0.1.0-dev.1",
     .minimum_zig_version = "0.15.1",
-    .paths = .{""},
+    .paths = .{
+        "src",
+        "build.zig",
+        "build.zig.zon",
+        "LICENSE",
+    },
     .fingerprint = 0xf1ae246d1f30bc4f,
 }
