@@ -6,6 +6,9 @@ pub const Language = enum {
     c,
     cpp,
     rust,
+    python,
+    js,
+    go,
 };
 
 pub const BfEnvironment = struct {

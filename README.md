@@ -35,6 +35,9 @@ The compiler/interpreter is highly incomplete, here is a incomprehensive list of
     - [ ] C
     - [ ] C++
     - [ ] Rust
+    - [ ] Python
+    - [ ] Javascript
+    - [ ] Golang
 - [ ] Compilation to an executable
 - [ ] Build system
 - [ ] REPL
