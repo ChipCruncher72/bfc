@@ -8,5 +8,5 @@
         "build.zig.zon",
         "LICENSE",
     },
-    .fingerprint = 0xf1ae246d1f30bc4f,
+    .fingerprint = 0x530e3a9fd100fa48,
 }

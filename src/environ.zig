@@ -93,7 +93,10 @@ pub const BfEnvironment = struct {
                         _ = loop_idxs.orderedRemove(loop_idxs.items.len-1);
                     }
                 },
-                '.' => try environ.writer.writeByte(environ.tape[environ.pointer]),
+                '.' => {
+                    try environ.writer.writeByte(environ.tape[environ.pointer]);
+                    try environ.writer.flush();
+                },
                 ',' => environ.tape[environ.pointer] = environ.reader.takeByte() catch |e| blk: {
                     if (e == error.EndOfStream) break :blk environ.tape[environ.pointer]
                     else return e;

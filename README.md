@@ -21,9 +21,9 @@ You should be able to find the executable under `./zig-out/bin` named "bfc"
 
 ## Roadmap
 This toolchain is highly incomplete, here is a incomprehensive list of things left to do:
-- [ ] Interpret files
+- [x] Interpret files
 - [ ] Allow io to files
-- [ ] Add a `-h` and `--help` compiler flag
+- [x] Add a `-h` and `--help` compiler flag
 - [ ] Implement trans-compilation
     - [ ] Zig
     - [ ] C
