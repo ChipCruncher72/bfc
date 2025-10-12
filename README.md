@@ -1,4 +1,4 @@
-# `bfc`: The Brainfuck Compiler Toolchain
+# `bfc`: The Brainfuck Compiler and Interpreter
 
 > [!WARNING]
 > This project is in pre-release, expect bugs and/or an unfinished product if you decide to download this
@@ -17,10 +17,14 @@ zig build
 # Optional compiler flags
 zig build -Doptimize=ReleaseFast
 ```
-You should be able to find the executable under `./zig-out/bin` named "bfc"
+You should now be able to find the executable under `./zig-out/bin` named "bfc"
+```
+# Run this to get help for the compiler
+bfc -h
+```
 
-## Roadmap
-This toolchain is highly incomplete, here is a incomprehensive list of things left to do:
+## Tasks
+This compiler/interpreter is highly incomplete, here is a incomprehensive list of things left to do:
 - [x] Interpret files
 - [ ] Allow io to files
 - [x] Add a `-h` and `--help` compiler flag
@@ -31,3 +35,4 @@ This toolchain is highly incomplete, here is a incomprehensive list of things le
     - [ ] Rust
 - [ ] Compilation to an executable
 - [ ] Build system
+- [ ] REPL
