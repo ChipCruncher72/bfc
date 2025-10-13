@@ -1,6 +1,6 @@
 .{
     .name = .bfc,
-    .version = "0.1.0-dev.1",
+    .version = "0.1.0-dev",
     .minimum_zig_version = "0.15.1",
     .paths = .{
         "src",
