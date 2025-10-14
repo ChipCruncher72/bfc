@@ -34,9 +34,9 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
             \\
             \\    Flags:
             \\    -f [string], --file=[string]    (REQUIRED) File to process
-            \\    -i,          --interpret        (REQUIRED (for now)) Interpret the source file
+            \\    -i,          --interpret        Interpret the source file
             \\    -c           --compile          (UNIMPLEMENTED) Compile the source file
-            \\    -t [lang]    --transpile=[lang] (UNIMPLEMENTED) Transpile the source file
+            \\    -t [lang]    --transpile=[lang] Transpile the source file
             \\    -l [usize],  --len=[usize]      Length of the tape
             \\    -h,          --help             Print this message then exit
             \\    --repl                          Start Brainfuck REPL
@@ -326,8 +326,8 @@ pub fn main() !void {
         return;
     }
 
-    if (args.mode != .interpret) {
-        std.log.err("Use of unimplemented mode: '{s}'", .{@tagName(args.mode)});
+    if (args.mode == .compile) {
+        std.log.err("Use of unimplemented mode: 'compile'", .{});
         return error.WrongMode;
     }
 
@@ -367,7 +367,33 @@ pub fn main() !void {
 
     @memset(tape, 0);
 
-    var bf: BfEnvironment = .init(stdout, stdin, tape[0..]);
+    switch (args.mode) {
+        .interpret => {
+            var bf: BfEnvironment = .init(stdout, stdin, tape);
+            try bf.exec(gpa, content);
+        },
+        .transpile => |lang| switch (lang) {
+            .c => {
+                const out_file_name = try std.fmt.allocPrint(gpa, "{s}.c", .{args.file_name});
+                defer gpa.free(out_file_name);
 
-    try bf.exec(gpa, content);
+                var file_buf: [4096]u8 = undefined;
+                var file_writer = (std.fs.cwd().createFile(out_file_name, .{}) catch |e| {
+                    std.log.err("Failure trying to create transpiled source: {}", .{e});
+                    return e;
+                }).writer(file_buf[0..]);
+                defer file_writer.file.close();
+
+                var reader = std.Io.Reader.failing;
+
+                const bf: BfEnvironment = .init(&file_writer.interface, &reader, tape);
+                try bf.transpileC(content);
+            },
+            else => {
+                std.log.err("Language '{s}' unimplemented", .{@tagName(lang)});
+                return error.WrongLang;
+            },
+        },
+        else => unreachable,
+    }
 }

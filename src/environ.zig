@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const bf_instr = @embedFile("bf_instr.h");
+
 pub const Language = enum {
     // Planned languages for trans-compliation
     zig,
@@ -118,8 +120,29 @@ pub const BfEnvironment = struct {
         }
     }
 
-    // TODO
-    //pub fn transpile(environ: BfEnvironment, program: []const u8, lang: Language) !void {}
+    pub fn transpileC(environ: BfEnvironment, program: []const u8) !void {
+        try environ.writer.writeAll("/* Inlined header file: bf_instr.h */\n");
+        try environ.writer.writeAll(bf_instr);
+        try environ.writer.writeAll("/* End of inlined header */\n");
+
+        try environ.writer.print("_init_bf({})", .{environ.tape.len});
+        for (program) |instr| {
+            switch (instr) {
+                '+' => try environ.writer.writeAll("_incr_tape()"),
+                '-' => try environ.writer.writeAll("_decr_tape()"),
+                '>' => try environ.writer.writeAll("_incr_ptr()"),
+                '<' => try environ.writer.writeAll("_decr_ptr()"),
+                '[' => try environ.writer.writeAll("_begin_loop()"),
+                ']' => try environ.writer.writeAll("_end_loop()"),
+                '.' => try environ.writer.writeAll("_write()"),
+                ',' => try environ.writer.writeAll("_read()"),
+                else => {},
+            }
+        }
+        try environ.writer.writeAll("_end_bf()");
+
+        try environ.writer.flush();
+    }
 };
 
 test "Hello, World!" {
@@ -127,10 +150,8 @@ test "Hello, World!" {
     var tape: [1000]u8 = @splat(0);
 
     var out_buf: [100]u8 = undefined;
-    const in_buf: [0]u8 = undefined;
-
     var writer: std.Io.Writer = .fixed(out_buf[0..]);
-    var reader: std.Io.Reader = .fixed(in_buf[0..]);
+    var reader = std.Io.Reader.failing;
 
     var bf: BfEnvironment = .init(&writer, &reader, tape[0..]);
     try bf.exec(gpa,
@@ -179,10 +200,8 @@ test "quine" {
     ;
 
     var out_buf: [program.len]u8 = undefined;
-    const in_buf: [0]u8 = undefined;
-
     var writer: std.Io.Writer = .fixed(out_buf[0..]);
-    var reader: std.Io.Reader = .fixed(in_buf[0..]);
+    var reader = std.Io.Reader.failing;
 
     var bf: BfEnvironment = .init(&writer, &reader, tape[0..]);
     try bf.exec(gpa, program);
@@ -190,6 +209,7 @@ test "quine" {
     try std.testing.expectEqualStrings(writer.buffered(), program);
 }
 
+// TBI
 test "BfEnvironment.transpile" {
     return error.SkipZigTest;
 }

@@ -32,7 +32,7 @@ The compiler/interpreter is highly incomplete, here is a incomprehensive list of
 - [x] Add a `-h` and `--help` compiler flag
 - [ ] Implement trans-compilation
     - [ ] Zig
-    - [ ] C
+    - [x] C
     - [ ] C++
     - [ ] Rust
     - [ ] Python
