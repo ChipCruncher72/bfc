@@ -14,7 +14,7 @@ pub fn build(b: *std.Build) !void {
     const exe = b.addExecutable(.{
         .name = "bfc",
         .root_module = exe_mod,
-        .version = SemVer.parse("0.1.0-dev") catch unreachable,
+        .version = SemVer.parse("0.1.0") catch unreachable,
     });
 
     b.installArtifact(exe);

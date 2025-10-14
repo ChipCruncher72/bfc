@@ -40,4 +40,4 @@ The compiler/interpreter is highly incomplete, here is a incomprehensive list of
     - [ ] Golang
 - [ ] Compilation to an executable
 - [ ] Build system
-- [ ] REPL
+- [x] REPL

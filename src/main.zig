@@ -16,6 +16,7 @@ const ArgsStruct = struct {
     file_name: []const u8,
     tape_length: ?usize,
     mode: BfMode,
+    repl_mode: bool,
 
     pub fn deinit(self: ArgsStruct, allocator: std.mem.Allocator) void {
         allocator.free(self.file_name);
@@ -38,6 +39,7 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
             \\    -t [lang]    --transpile=[lang] (UNIMPLEMENTED) Transpile the source file
             \\    -l [usize],  --len=[usize]      Length of the tape
             \\    -h,          --help             Print this message then exit
+            \\    --repl                          Start Brainfuck REPL
             \\
             , .{});
             return error.Exit0; // This is to gracefully return from the function, avoiding memory leaks
@@ -45,6 +47,7 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
     }
 
     var tape_length: ?usize = null;
+    var repl_mode = false;
     var mode: ?BfMode = null;
     var file_name: ?[]const u8 = null;
     errdefer if (file_name) |fname| allocator.free(fname);
@@ -52,6 +55,14 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
     {var i: usize = 1;
     while (i < args.len) : (i += 1) {
         const arg = args[i];
+        if (std.mem.eql(u8, arg, "--repl")) {
+            if (repl_mode) {
+                std.log.err("Repeat of already defined flag '{s}'", .{arg});
+            }
+
+            repl_mode = true;
+            continue;
+        }
         if (std.mem.eql(u8, arg, "-i") or std.mem.eql(u8, arg, "--interpret")) {
             if (mode != null) {
                 std.log.err("Repeat of already defined flag: '{s}'", .{arg});
@@ -220,16 +231,79 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
         return error.Unknown;
     }}
 
-    if (mode == null) {
+    if (mode == null and !repl_mode) {
         std.log.err("Missing flag -i, -c, or -t", .{});
         return error.MissingFlag;
     }
-    if (file_name == null) {
+    if (file_name == null and !repl_mode) {
         std.log.err("Missing input file (hint use -f)", .{});
         return error.MissingFlag;
     }
 
-    return .{ .file_name = file_name.?, .tape_length = tape_length, .mode = mode.? };
+    return .{
+        .file_name = file_name orelse "",
+        .tape_length = tape_length,
+        .mode = mode orelse .interpret,
+        .repl_mode = repl_mode,
+    };
+}
+
+pub fn REPL(allocator: std.mem.Allocator, tape: []u8) !void {
+    var stdout_buf: [4096]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(stdout_buf[0..]);
+    const stdout = &stdout_writer.interface;
+
+    var stdin_buf: [4096]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(stdin_buf[0..]);
+    const stdin = &stdin_reader.interface;
+
+    var bf: BfEnvironment = .init(stdout, stdin, tape[0..]);
+
+    try stdout.print("info: Write 'END' to quit the REPL gracefully\n", .{});
+    var eval_input: std.Io.Writer.Allocating = .init(allocator);
+    defer eval_input.deinit();
+
+    while (true) {
+        try stdout.print(">>> ", .{});
+        try stdout.flush();
+
+        var do_toss = true;
+        _ = stdin.streamDelimiter(&eval_input.writer, '\n') catch |e| {
+            if (e != error.EndOfStream) {
+                return e;
+            }
+            do_toss = false;
+        };
+        if (do_toss) stdin.toss(1);
+
+        var input = eval_input.written();
+        if (input[input.len-1] == '\r') {
+            input.len -= 1;
+        }
+        if (std.mem.eql(u8, input, "END")) {
+            break;
+        }
+
+        try bf.exec(allocator, input);
+        stdin.tossBuffered();
+
+        var end_idx: usize = undefined;
+        {var i = tape.len-1;
+        while (i > 0 and tape[i] == 0) {
+            i -= 1;
+        }end_idx = i+1;}
+
+        try stdout.writeAll("\n{");
+        for (tape[0..end_idx], 0..) |cell, idx| {
+            try stdout.print("{}", .{cell});
+            if (idx != end_idx-1) {
+                try stdout.writeAll(", ");
+            }
+        }
+        try stdout.writeAll("}\n");
+
+        eval_input.clearRetainingCapacity();
+    }
 }
 
 pub fn main() !void {
@@ -242,6 +316,15 @@ pub fn main() !void {
         }
     };
     defer args.deinit(gpa);
+
+    if (args.repl_mode) {
+        const tape = try gpa.alloc(u8, args.tape_length orelse 30_000);
+        defer gpa.free(tape);
+        @memset(tape, 0);
+
+        try REPL(gpa, tape);
+        return;
+    }
 
     if (args.mode != .interpret) {
         std.log.err("Use of unimplemented mode: '{s}'", .{@tagName(args.mode)});
@@ -279,7 +362,7 @@ pub fn main() !void {
     var stdin_reader = std.fs.File.stdin().reader(stdin_buf[0..]);
     const stdin = &stdin_reader.interface;
 
-    var tape = try gpa.alloc(u8, args.tape_length orelse 30_000);
+    const tape = try gpa.alloc(u8, args.tape_length orelse 30_000);
     defer gpa.free(tape);
 
     @memset(tape, 0);
