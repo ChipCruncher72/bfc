@@ -14,11 +14,15 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 #include <stdio.h>
 #include <stddef.h>
 
+typedef unsigned char byte;
+
 #define STD_PREFIX(value) value
 #define _init_bf(N) int main(void){byte tape[N]={0};size_t ptr=0;
 #else
 #include <cstdio>
 #include <cstddef>
+
+using byte = unsigned char;
 
 #define STD_PREFIX(value) std::value
 #define _init_bf(N) int main(){byte tape[N]={0};std::size_t ptr=0;
@@ -35,7 +39,6 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 #define _read() {int tmp;tape[ptr]=((tmp=STD_PREFIX(fgetc(stdin)))!=EOF)?((byte)tmp):tape[ptr];}
 
 #define TAPE_LENGTH sizeof(tape)
-typedef unsigned char byte;
 
 #endif
 
