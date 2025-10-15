@@ -373,8 +373,8 @@ pub fn main() !void {
             try bf.exec(gpa, content);
         },
         .transpile => |lang| switch (lang) {
-            .c => {
-                const out_file_name = try std.fmt.allocPrint(gpa, "{s}.c", .{args.file_name});
+            .c, .cpp => {
+                const out_file_name = try std.fmt.allocPrint(gpa, "{s}.{s}", .{args.file_name, @tagName(lang)});
                 defer gpa.free(out_file_name);
 
                 var file_buf: [4096]u8 = undefined;
@@ -387,7 +387,7 @@ pub fn main() !void {
                 var reader = std.Io.Reader.failing;
 
                 const bf: BfEnvironment = .init(&file_writer.interface, &reader, tape);
-                try bf.transpileC(content);
+                try bf.transpileCCPP(content);
             },
             else => {
                 std.log.err("Language '{s}' unimplemented", .{@tagName(lang)});

@@ -120,7 +120,7 @@ pub const BfEnvironment = struct {
         }
     }
 
-    pub fn transpileC(environ: BfEnvironment, program: []const u8) !void {
+    pub fn transpileCCPP(environ: BfEnvironment, program: []const u8) !void {
         try environ.writer.writeAll("/* Inlined header file: bf_instr.h */\n");
         try environ.writer.writeAll(bf_instr);
         try environ.writer.writeAll("/* End of inlined header */\n");

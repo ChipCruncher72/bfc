@@ -10,14 +10,20 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 #ifndef _BF_INSTR_
 #define _BF_INSTR_
 
+#ifndef __cplusplus
 #include <stdio.h>
 #include <stddef.h>
 
-typedef unsigned char byte;
-
-#define TAPE_LENGTH sizeof(tape)
-
+#define STD_PREFIX(value) value
 #define _init_bf(N) int main(void){byte tape[N]={0};size_t ptr=0;
+#else
+#include <cstdio>
+#include <cstddef>
+
+#define STD_PREFIX(value) std::value
+#define _init_bf(N) int main(){byte tape[N]={0};std::size_t ptr=0;
+#endif
+
 #define _end_bf() return 0;}
 #define _incr_tape() tape[ptr]++;
 #define _decr_tape() tape[ptr]--;
@@ -25,8 +31,11 @@ typedef unsigned char byte;
 #define _decr_ptr() ptr=(ptr==0)?TAPE_LENGTH-1:ptr-1;
 #define _begin_loop() while(tape[ptr]) {
 #define _end_loop() }
-#define _write() ((void)fputc(tape[ptr],stdout));
-#define _read() {int tmp;tape[ptr]=((tmp=fgetc(stdin))!=EOF)?((byte)tmp):tape[ptr];}
+#define _write() ((void)STD_PREFIX(fputc(tape[ptr],stdout)));
+#define _read() {int tmp;tape[ptr]=((tmp=STD_PREFIX(fgetc(stdin)))!=EOF)?((byte)tmp):tape[ptr];}
+
+#define TAPE_LENGTH sizeof(tape)
+typedef unsigned char byte;
 
 #endif
 
