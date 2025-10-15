@@ -33,7 +33,7 @@ The compiler/interpreter is highly incomplete, here is a incomprehensive list of
 - [ ] Implement trans-compilation
     - [ ] Zig
     - [x] C
-    - [ ] C++
+    - [x] C++
     - [ ] Rust
     - [ ] Python
     - [ ] Javascript
