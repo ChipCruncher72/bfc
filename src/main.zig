@@ -28,8 +28,8 @@ const ArgsStruct = struct {
 
 pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
     const params = comptime clap.parseParamsComptime(
-        \\-h, --help              (REQUIRED) Print this help message then exit
-        \\-f, --file <FILE>       Input file to parse
+        \\-h, --help              Print this help message then exit
+        \\-f, --file <FILE>       (REQUIRED) Input file to parse
         \\-i, --interpret         Interpret the input files
         \\-c, --compile           (UNIMPLEMENTED) Compile the input files
         \\-t, --transpile <LANG>  Transpile the input files
