@@ -1,6 +1,9 @@
 const std = @import("std");
+const clap = @import("clap");
 const environ = @import("environ.zig");
 const BfEnvironment = environ.BfEnvironment;
+
+const DEFAULT_TAPE_LENGTH = 30_000;
 
 pub const std_options: std.Options = .{
     .log_level = .warn,
@@ -14,7 +17,7 @@ const BfMode = union(enum) {
 
 const ArgsStruct = struct {
     file_name: []const u8,
-    tape_length: ?usize,
+    tape_length: usize,
     mode: BfMode,
     repl_mode: bool,
 
@@ -24,227 +27,101 @@ const ArgsStruct = struct {
 };
 
 pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const params = comptime clap.parseParamsComptime(
+        \\-h, --help              (REQUIRED) Print this help message then exit
+        \\-f, --file <FILE>       Input file to parse
+        \\-i, --interpret         Interpret the input files
+        \\-c, --compile           (UNIMPLEMENTED) Compile the input files
+        \\-t, --transpile <LANG>  Transpile the input files
+        \\-l, --length <usize>    Length of the tape
+        \\    --repl              Start the Brainfuck REPL
+    );
+    const parsers = comptime .{
+        .FILE = clap.parsers.string,
+        .LANG = clap.parsers.enumeration(environ.Language),
+        .usize = clap.parsers.int(usize, 0),
+    };
 
-    for (args[1..]) |arg| {
-        if (std.mem.eql(u8, arg, "-h") or std.mem.eql(u8, arg, "--help")) {
-            std.debug.print(
-            \\Usage: bfc -f [filename] -i (extra flags)
-            \\
-            \\    Flags:
-            \\    -f [string], --file=[string]    (REQUIRED) File to process
-            \\    -i,          --interpret        Interpret the source file
-            \\    -c           --compile          (UNIMPLEMENTED) Compile the source file
-            \\    -t [lang]    --transpile=[lang] Transpile the source file
-            \\    -l [usize],  --len=[usize]      Length of the tape
-            \\    -h,          --help             Print this message then exit
-            \\    --repl                          Start Brainfuck REPL
-            \\
-            , .{});
-            return error.Exit0; // This is to gracefully return from the function, avoiding memory leaks
+    var diag: clap.Diagnostic = .{};
+    var res = clap.parse(clap.Help, &params, parsers, .{
+        .diagnostic = &diag,
+        .allocator = allocator,
+    }) catch |err| {
+        switch (err) {
+            // Transpile flag failed to parse
+            error.NameNotPartOfEnum => {
+                std.log.err(
+                    \\Invalid language provided to transpile flag
+                    \\
+                    \\List of valid languages:
+                    \\    zig
+                    \\    c
+                    \\    cpp
+                    \\    rust
+                    \\    python
+                    \\    js
+                    \\    go
+                , .{});
+                return error.InvalidLang;
+            },
+            // Length flag failed to parse
+            error.Overflow => {
+                std.log.err("Integer too big to fit into a {}-bit unsigned integer (flag --length)", .{@bitSizeOf(usize)});
+                return err;
+            },
+            error.InvalidCharacter => {
+                std.log.err("Provided value is not a valid unsigned integer (flag --length)", .{});
+                return err;
+            },
+
+            else => {},
         }
+
+        try diag.reportToFile(.stderr(), err);
+        return err;
+    };
+    defer res.deinit();
+
+    if (res.args.help != 0) {
+        std.debug.print("Usage: bfc ", .{});
+        try clap.usageToFile(.stderr(), clap.Help, &params);
+        std.debug.print("\n", .{});
+        try clap.helpToFile(.stderr(), clap.Help, &params, .{});
+        std.debug.print("\n", .{});
+        return error.Exit0; // This is to exit gracefully, ensuring we don't leak memory
+    }
+    if (res.args.repl != 0) {
+        return .{
+            .file_name = &.{},
+            .mode = undefined,
+            .tape_length = res.args.length orelse DEFAULT_TAPE_LENGTH,
+            .repl_mode = true,
+        };
+    }
+    if (res.args.file == null) {
+        std.log.err("Missing input file (Hint: use -f)", .{});
+        return error.MissingFlag;
     }
 
-    var tape_length: ?usize = null;
-    var repl_mode = false;
     var mode: ?BfMode = null;
-    var file_name: ?[]const u8 = null;
-    errdefer if (file_name) |fname| allocator.free(fname);
 
-    {var i: usize = 1;
-    while (i < args.len) : (i += 1) {
-        const arg = args[i];
-        if (std.mem.eql(u8, arg, "--repl")) {
-            if (repl_mode) {
-                std.log.err("Repeat of already defined flag '{s}'", .{arg});
-            }
+    if (res.args.interpret != 0) {
+        mode = .interpret;
+    } else if (res.args.compile != 0) {
+        mode = .compile;
+    } else if (res.args.transpile) |t| {
+        mode = .{ .transpile = t };
+    }
 
-            repl_mode = true;
-            continue;
-        }
-        if (std.mem.eql(u8, arg, "-i") or std.mem.eql(u8, arg, "--interpret")) {
-            if (mode != null) {
-                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
-                return error.Repeat;
-            }
-
-            mode = .interpret;
-            continue;
-        }
-        if (std.mem.eql(u8, arg, "-c") or std.mem.eql(u8, arg, "--compile")) {
-            if (mode != null) {
-                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
-                return error.Repeat;
-            }
-
-            mode = .compile;
-            continue;
-        }
-        if (std.mem.eql(u8, arg, "-t")) {
-            if (mode != null) {
-                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
-                return error.Repeat;
-            }
-
-            if (i == args.len-1) {
-                std.log.err("Missing required parameter for argument -t", .{});
-                return error.MissingValue;
-            }
-
-            i += 1;
-            const str_to_enum = std.meta.stringToEnum(environ.Language, args[i]);
-
-            if (str_to_enum == null) {
-                std.log.err(
-                    \\Invalid language provided: '{s}'
-                    \\
-                    \\List of valid languages:
-                    \\    zig
-                    \\    c
-                    \\    cpp
-                    \\    rust
-                    \\    python
-                    \\    js
-                    \\    go
-                , .{args[i]});
-                return error.InvalidLang;
-            }
-
-            mode = .{ .transpile = str_to_enum.? };
-            continue;
-        }
-        if (std.mem.startsWith(u8, arg, "--transpile=")) {
-            if (mode != null) {
-                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
-                return error.Repeat;
-            }
-
-            const lang = arg[12..];
-            if (lang.len == 0) {
-                std.log.err("No value provided for argument --transpile=[lang]", .{});
-                return error.MissingValue;
-            }
-
-            const str_to_enum = std.meta.stringToEnum(environ.Language, lang);
-
-            if (str_to_enum == null) {
-                std.log.err(
-                    \\Invalid language provided: '{s}'
-                    \\
-                    \\List of valid languages:
-                    \\    zig
-                    \\    c
-                    \\    cpp
-                    \\    rust
-                    \\    python
-                    \\    js
-                    \\    go
-                , .{lang});
-                return error.InvalidLang;
-            }
-
-            mode = .{ .transpile = str_to_enum.? };
-            continue;
-        }
-        if (std.mem.eql(u8, arg, "-l")) {
-            if (tape_length != null) {
-                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
-                return error.Repeat;
-            }
-
-            if (i == args.len-1) {
-                std.log.err("Missing required parameter for argument -l", .{});
-                return error.MissingValue;
-            }
-
-            i += 1;
-            const num = args[i];
-
-            tape_length = std.fmt.parseUnsigned(usize, num, 0) catch |e| {
-                switch (e) {
-                    error.Overflow => std.log.err("Integer '{s}' too large to be stored in a {}-bit unsigned integer", .{
-                        num,
-                        @bitSizeOf(usize),
-                    }),
-                    error.InvalidCharacter => std.log.err("String '{s}' is not a valid unsigned integer", .{num}),
-                }
-                return e;
-            };
-            continue;
-        }
-        if (std.mem.startsWith(u8, arg, "--len=")) {
-            if (tape_length != null) {
-                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
-                return error.Repeat;
-            }
-
-            const num = arg[6..];
-            if (num.len == 0) {
-                std.log.err("No value provided for argument --len=[usize]", .{});
-                return error.MissingValue;
-            }
-
-            tape_length = std.fmt.parseUnsigned(usize, num, 0) catch |e| {
-                switch (e) {
-                    error.Overflow => std.log.err("Integer '{s}' too large to be stored in a {}-bit unsigned integer", .{
-                        num,
-                        @bitSizeOf(usize),
-                    }),
-                    error.InvalidCharacter => std.log.err("String '{s}' is not a valid unsigned integer", .{num}),
-                }
-                return e;
-            };
-            continue;
-        }
-        if (std.mem.eql(u8, arg, "-f")) {
-            if (file_name != null) {
-                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
-                return error.Repeat;
-            }
-
-            if (i == args.len-1) {
-                std.log.err("Missing required parameter for argument -f", .{});
-                return error.MissingValue;
-            }
-
-            i += 1;
-            file_name = try allocator.dupe(u8, args[i]);
-            continue;
-        }
-        if (std.mem.startsWith(u8, arg, "--file=")) {
-            if (file_name != null) {
-                std.log.err("Repeat of already defined flag: '{s}'", .{arg});
-                return error.Repeat;
-            }
-
-            const file = arg[7..];
-            if (file.len == 0) {
-                std.log.err("No value provided for argument --file=[string]", .{});
-                return error.MissingValue;
-            }
-
-            file_name = try allocator.dupe(u8, file);
-            continue;
-        }
-        std.log.err("Unknown flag or parameter: '{s}'", .{arg});
-        return error.Unknown;
-    }}
-
-    if (mode == null and !repl_mode) {
+    if (mode == null) {
         std.log.err("Missing flag -i, -c, or -t", .{});
         return error.MissingFlag;
     }
-    if (file_name == null and !repl_mode) {
-        std.log.err("Missing input file (hint use -f)", .{});
-        return error.MissingFlag;
-    }
-
     return .{
-        .file_name = file_name orelse "",
-        .tape_length = tape_length,
-        .mode = mode orelse .interpret,
-        .repl_mode = repl_mode,
+        .mode = mode.?,
+        .tape_length = res.args.length orelse DEFAULT_TAPE_LENGTH,
+        .file_name = try allocator.dupe(u8, res.args.file.?),
+        .repl_mode = false,
     };
 }
 
@@ -318,7 +195,7 @@ pub fn main() !void {
     defer args.deinit(gpa);
 
     if (args.repl_mode) {
-        const tape = try gpa.alloc(u8, args.tape_length orelse 30_000);
+        const tape = try gpa.alloc(u8, args.tape_length);
         defer gpa.free(tape);
         @memset(tape, 0);
 
@@ -362,7 +239,7 @@ pub fn main() !void {
     var stdin_reader = std.fs.File.stdin().reader(stdin_buf[0..]);
     const stdin = &stdin_reader.interface;
 
-    const tape = try gpa.alloc(u8, args.tape_length orelse 30_000);
+    const tape = try gpa.alloc(u8, args.tape_length);
     defer gpa.free(tape);
 
     @memset(tape, 0);

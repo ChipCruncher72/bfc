@@ -11,6 +11,9 @@ pub fn build(b: *std.Build) !void {
         .target = target,
     });
 
+    const clap = b.dependency("clap", .{});
+    exe_mod.addImport("clap", clap.module("clap"));
+
     const exe = b.addExecutable(.{
         .name = "bfc",
         .root_module = exe_mod,
@@ -26,6 +29,9 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .target = target,
     });
+
+    test_mod.addImport("clap", clap.module("clap"));
+
     const unit_test = b.addTest(.{
         .root_module = test_mod,
     });
