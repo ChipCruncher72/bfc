@@ -214,7 +214,7 @@ pub fn main() !void {
     const og_stdout = &stdout_writer.interface;
     defer if (og_stdout != stdout) stdout_writer.file.close();
 
-    if (args.output_file) |output| if (args.mode != .transpile) {
+    if (args.output_file) |output| if (args.mode == .interpret) {
         stdout_writer = (std.fs.cwd().createFile(output, .{}) catch |e| {
             std.log.err("Failure trying to create output file '{s}': {}", .{output, e});
             return e;
@@ -228,7 +228,7 @@ pub fn main() !void {
     const og_stdin = &stdin_reader.interface;
     defer if (og_stdin != stdin) stdin_reader.file.close();
 
-    if (args.input_file) |input| if (args.mode != .transpile) {
+    if (args.input_file) |input| if (args.mode == .interpret) {
         stdin_reader = (std.fs.cwd().openFile(input, .{}) catch |e| {
             std.log.err("Failure trying to open input file '{s}': {}", .{input, e});
             return e;
