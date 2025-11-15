@@ -28,7 +28,7 @@ bfc -h
 ## Tasks
 The compiler/interpreter is highly incomplete, here is a incomprehensive list of things left to do:
 - [x] Interpret files
-- [ ] Allow io to files
+- [x] Allow io to files (interpreter only)
 - [x] Add a `-h` and `--help` compiler flag
 - [ ] Implement trans-compilation
     - [ ] Zig

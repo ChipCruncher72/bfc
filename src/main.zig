@@ -17,12 +17,18 @@ const BfMode = union(enum) {
 
 const ArgsStruct = struct {
     file_name: []const u8,
+    input_file: ?[]const u8,
+    output_file: ?[]const u8,
     tape_length: usize,
     mode: BfMode,
     repl_mode: bool,
 
     pub fn deinit(self: ArgsStruct, allocator: std.mem.Allocator) void {
         allocator.free(self.file_name);
+        if (self.output_file) |output|
+            allocator.free(output);
+        if (self.input_file) |input|
+            allocator.free(input);
     }
 };
 
@@ -30,6 +36,8 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help              Print this help message then exit
         \\-f, --file <FILE>       (REQUIRED) Input file to parse
+        \\    --input <FILE>      Input file to read from using `,` instruction (INTERPRET ONLY)
+        \\    --output <FILE>     Output file to write to using `.` instruction (INTERPRET ONLY)
         \\-i, --interpret         Interpret the input files
         \\-c, --compile           (UNIMPLEMENTED) Compile the input files
         \\-t, --transpile <LANG>  Transpile the input files
@@ -94,6 +102,8 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
         return .{
             .file_name = &.{},
             .mode = undefined,
+            .input_file = null,
+            .output_file = null,
             .tape_length = res.args.length orelse DEFAULT_TAPE_LENGTH,
             .repl_mode = true,
         };
@@ -117,23 +127,27 @@ pub fn parseArgs(allocator: std.mem.Allocator) !ArgsStruct {
         std.log.err("Missing flag -i, -c, or -t", .{});
         return error.MissingFlag;
     }
+
+    var allocated_input: ?[]const u8 = null;
+    errdefer if (allocated_input) |input| allocator.free(input);
+    var allocated_output: ?[]const u8 = null;
+    errdefer if (allocated_output) |output| allocator.free(output);
+    if (res.args.input) |input|
+        allocated_input = try allocator.dupe(u8, input);
+    if (res.args.output) |output|
+        allocated_output = try allocator.dupe(u8, output);
+
     return .{
         .mode = mode.?,
         .tape_length = res.args.length orelse DEFAULT_TAPE_LENGTH,
         .file_name = try allocator.dupe(u8, res.args.file.?),
+        .input_file = allocated_input,
+        .output_file = allocated_output,
         .repl_mode = false,
     };
 }
 
-pub fn REPL(allocator: std.mem.Allocator, tape: []u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(stdout_buf[0..]);
-    const stdout = &stdout_writer.interface;
-
-    var stdin_buf: [4096]u8 = undefined;
-    var stdin_reader = std.fs.File.stdin().reader(stdin_buf[0..]);
-    const stdin = &stdin_reader.interface;
-
+pub fn REPL(allocator: std.mem.Allocator, tape: []u8, stdout: *std.Io.Writer, stdin: *std.Io.Reader) !void {
     var bf: BfEnvironment = .init(stdout, stdin, tape[0..]);
 
     try stdout.print("info: Write 'END' to quit the REPL gracefully\n", .{});
@@ -194,12 +208,40 @@ pub fn main() !void {
     };
     defer args.deinit(gpa);
 
+    var stdout_buf: [4096]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buf);
+    var stdout = &stdout_writer.interface;
+    const og_stdout = &stdout_writer.interface;
+    defer if (og_stdout != stdout) stdout_writer.file.close();
+
+    if (args.output_file) |output| if (args.mode != .transpile) {
+        stdout_writer = (std.fs.cwd().createFile(output, .{}) catch |e| {
+            std.log.err("Failure trying to create output file '{s}': {}", .{output, e});
+            return e;
+        }).writer(&stdout_buf);
+        stdout = &stdout_writer.interface;
+    };
+
+    var stdin_buf: [4096]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buf);
+    var stdin = &stdin_reader.interface;
+    const og_stdin = &stdin_reader.interface;
+    defer if (og_stdin != stdin) stdin_reader.file.close();
+
+    if (args.input_file) |input| if (args.mode != .transpile) {
+        stdin_reader = (std.fs.cwd().openFile(input, .{}) catch |e| {
+            std.log.err("Failure trying to open input file '{s}': {}", .{input, e});
+            return e;
+        }).reader(&stdin_buf);
+        stdin = &stdin_reader.interface;
+    };
+
     if (args.repl_mode) {
         const tape = try gpa.alloc(u8, args.tape_length);
         defer gpa.free(tape);
         @memset(tape, 0);
 
-        try REPL(gpa, tape);
+        try REPL(gpa, tape, stdout, stdin);
         return;
     }
 
@@ -230,14 +272,6 @@ pub fn main() !void {
         std.log.err("Failure trying to read source file '{s}': {}", .{args.file_name, e});
         return e;
     };
-
-    var stdout_buf: [4096]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(stdout_buf[0..]);
-    const stdout = &stdout_writer.interface;
-
-    var stdin_buf: [4096]u8 = undefined;
-    var stdin_reader = std.fs.File.stdin().reader(stdin_buf[0..]);
-    const stdin = &stdin_reader.interface;
 
     const tape = try gpa.alloc(u8, args.tape_length);
     defer gpa.free(tape);
