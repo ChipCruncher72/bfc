@@ -2,6 +2,13 @@
 <sup>\*Cannot compile any code as of yet</sup>\
 <sup>`bfc` stands for BrainFuck Code tool (The tool is silent)</sup>
 
+> [!IMPORTANT]
+> I have moved this repository to [Codeberg](https://codeberg.org/ChipCruncher72/bfc) and archived it\
+> I should also advise you not to contact me through GitHub as I am likely to be way less active and may not reply, or even see your message in the first place\
+> My other repositories will be archived in due time as well
+
+---
+
 > [!WARNING]
 > This project is in pre-release, expect bugs and/or an unfinished product if you decide to download this
 
